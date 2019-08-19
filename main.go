@@ -230,39 +230,44 @@ func main() {
 
 	var pod gems.Version
 	var bundler gems.Version
-	if useCocoapodsVersion == "" {
-		gemfileLockPth := filepath.Join(podfileDir, "Gemfile.lock")
-		log.Printf("Searching for Gemfile.lock with cocoapods gem")
 
-		if exist, err := pathutil.IsPathExists(gemfileLockPth); err != nil {
-			failf("Failed to check Gemfile.lock at: %s, error: %s", gemfileLockPth, err)
-		} else if exist {
-			content, err := fileutil.ReadStringFromFile(gemfileLockPth)
-			if err != nil {
-				failf("failed to read file (%s) contents, error: %s", gemfileLockPth, err)
-			}
+    log.Printf("Searching for Gemfile.lock with cocoapods gem")
 
-			pod, err = gems.ParseVersionFromBundle("cocoapods", content)
-			if err != nil {
-				failf("Failed to check if Gemfile.lock contains cocoapods, error: %s", err)
-			}
+    // Check Gemfile.lock for CocoaPods version
+    gemfileLockPth := filepath.Join(podfileDir, "Gemfile.lock")
+    isGemfileLockExists, err := pathutil.IsPathExists(gemfileLockPth)
+    if err != nil {
+        failf("Failed to check Gemfile.lock at: %s, error: %s", gemfileLockPth, err)
+    }
 
-			bundler, err = gems.ParseBundlerVersion(content)
-			if err != nil {
-				failf("Failed to parse bundler version form cocoapods, error: %s", err)
-			}
+    if isGemfileLockExists {
+		// CocoaPods exist search for version in Gemfile.lock
+        log.Printf("Found Gemfile.lock: %s", gemfileLockPth)
 
-			if pod.Found {
-				log.Printf("Found Gemfile.lock: %s", gemfileLockPth)
-				log.Donef("Gemfile.lock defined cocoapods version: %s", pod.Version)
+        content, err := fileutil.ReadStringFromFile(gemfileLockPth)
+        if err != nil {
+            failf("failed to read file (%s) contents, error: %s", gemfileLockPth, err)
+        }
 
-				useBundler = true
-			}
-		} else {
-			log.Printf("No Gemfile.lock with cocoapods gem found at: %s", gemfileLockPth)
-			log.Donef("Using system installed CocoaPods version")
-		}
-	}
+        pod, err = gems.ParseVersionFromBundle("cocoapods", content)
+        if err != nil {
+            failf("Failed to check if Gemfile.lock contains cocoapods, error: %s", err)
+        }
+
+        bundler, err = gems.ParseBundlerVersion(content)
+        if err != nil {
+            failf("Failed to parse bundler version form cocoapods, error: %s", err)
+        }
+
+        if pod.Found {
+            log.Donef("Gemfile.lock defined cocoapods version: %s", pod.Version)
+
+            useBundler = true
+        }
+    } else {
+        log.Printf("No Gemfile.lock with cocoapods gem found at: %s", gemfileLockPth)
+        log.Donef("Using system installed CocoaPods version")
+    }
 
 	// Install cocoapods
 	fmt.Println()
