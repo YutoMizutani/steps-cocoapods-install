@@ -197,7 +197,8 @@ func main() {
 	log.Infof("Determining required cocoapods version")
 
 	useBundler := false
-	useCocoapodsVersion := ""
+	useCocoapodsVersionFromPodfileLock := ""
+	useCocoapodsVersionFromGemfileLock := ""
 
 	log.Printf("Searching for Podfile.lock")
 
@@ -218,8 +219,8 @@ func main() {
 		}
 
 		if version != "" {
-			useCocoapodsVersion = version
-			log.Donef("Required CocoaPods version (from Podfile.lock): %s", useCocoapodsVersion)
+			useCocoapodsVersionFromPodfileLock = version
+			log.Donef("Required CocoaPods version (from Podfile.lock): %s", useCocoapodsVersionFromPodfileLock)
 		} else {
 			log.Warnf("No CocoaPods version found in Podfile.lock! (%s)", podfileLockPth)
 		}
@@ -260,9 +261,12 @@ func main() {
         }
 
         if pod.Found {
-            log.Donef("Gemfile.lock defined cocoapods version: %s", pod.Version)
+            useCocoapodsVersionFromGemfileLock = pod.Version
+            log.Donef("Required CocoaPods version (from Gemfile.lock): %s", useCocoapodsVersionFromGemfileLock)
 
-            useBundler = true
+            if !isPodfileLockExists || useCocoapodsVersionFromGemfileLock == useCocoapodsVersionFromPodfileLock {
+                useBundler = true
+            }
         }
     } else {
         log.Printf("No Gemfile.lock with cocoapods gem found at: %s", gemfileLockPth)
@@ -313,18 +317,18 @@ func main() {
 		if useBundler {
 			podCmdSlice = append(gems.BundleExecPrefix(bundler), podCmdSlice...)
 		}
-	} else if useCocoapodsVersion != "" {
-		log.Printf("Checking cocoapods %s gem", useCocoapodsVersion)
+	} else if useCocoapodsVersionFromPodfileLock != "" {
+		log.Printf("Checking cocoapods %s gem", useCocoapodsVersionFromPodfileLock)
 
-		installed, err := rubycommand.IsGemInstalled("cocoapods", useCocoapodsVersion)
+		installed, err := rubycommand.IsGemInstalled("cocoapods", useCocoapodsVersionFromPodfileLock)
 		if err != nil {
-			failf("Failed to check if cocoapods %s installed, error: %s", useCocoapodsVersion, err)
+			failf("Failed to check if cocoapods %s installed, error: %s", useCocoapodsVersionFromPodfileLock, err)
 		}
 
 		if !installed {
 			log.Printf("Installing")
 
-			cmds, err := rubycommand.GemInstall("cocoapods", useCocoapodsVersion)
+			cmds, err := rubycommand.GemInstall("cocoapods", useCocoapodsVersionFromPodfileLock)
 			if err != nil {
 				failf("Failed to create command model, error: %s", err)
 			}
@@ -342,7 +346,7 @@ func main() {
 			log.Printf("Installed")
 		}
 
-		podCmdSlice = append(podCmdSlice, fmt.Sprintf("_%s_", useCocoapodsVersion))
+		podCmdSlice = append(podCmdSlice, fmt.Sprintf("_%s_", useCocoapodsVersionFromPodfileLock))
 	} else {
 		log.Printf("Using system installed cocoapods")
 	}
