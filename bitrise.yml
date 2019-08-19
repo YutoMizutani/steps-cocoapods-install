@@ -60,6 +60,14 @@ workflows:
     - PODFILE_PTH: ''
     after_run:
     - _test_with_repo
+  test_with_gemfile_include_cocoapods_plugins:
+    envs:
+    # With Gemfile included CocoaPods plugins:
+    - REPO_URL: https://github.com/kylefleming/CocoaPodsBitriseIssue
+    - TEST_REPO_BRANCH: master
+    - PODFILE_PTH: ''
+    after_run:
+    - _test_with_repo
   test_without_gemfile:
     envs:
     # Without Gemfile:
@@ -110,6 +118,7 @@ workflows:
     - test_with_no_podfile_lock
     - test_with_gemfile
     - test_without_gemfile
+    - test_with_gemfile_include_cocoapods_plugins
     - test_without_gemfile_with_podfile_path
     - test_without_verbose
     - print_cache_paths
