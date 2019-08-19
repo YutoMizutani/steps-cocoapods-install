@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+    "strconv"
+	"strings"
 
 	"github.com/bitrise-io/bitrise-init/scanners/ios"
 	"github.com/bitrise-io/bitrise-init/utility"
@@ -131,6 +133,97 @@ func cocoapodsVersionFromPodfileLock(podfileLockPth string) (string, error) {
 		return "", err
 	}
 	return cocoapodsVersionFromPodfileLockContent(content), nil
+}
+
+func isIncludedInGemfileLockVersionRanges(ver string, gemfileLockVersion string) (bool, error) {
+	var ranges []string
+	ranges = strings.Split(gemfileLockVersion, ", ")
+
+	for _, rng := range ranges {
+        splitted := strings.Split(rng, " ")
+        aryCnt := len(splitted)
+
+        if aryCnt == 1 {
+            specifiedVer := splitted[0]
+
+            if ver != specifiedVer {
+                return false, nil
+            }
+            continue
+    	}
+
+        if aryCnt != 2 {
+    		err := fmt.Errorf("Invalid version range: %s", rng)
+            return false, err
+    	}
+
+        operator := splitted[0]
+        specifiedVer := splitted[1]
+
+        switch operator {
+        case "~>":
+            if ver != specifiedVer {
+                return false, nil
+            }
+
+            continue
+        case ">=":
+            specifiedVers := strings.Split(specifiedVer, ".")
+            vers := strings.Split(ver, ".")
+
+            for i, sv := range specifiedVers {
+                v1, err := strconv.Atoi(sv)
+                if err != nil {
+                    return false, err
+                }
+                v2, err := strconv.Atoi(vers[i])
+                if err != nil {
+                    return false, err
+                }
+
+                if i != len(specifiedVers) - 1 && v1 == v2 {
+                    continue
+                }
+                if v2 >= v1 {
+                    break
+                } else {
+                    return false, nil
+                }
+            }
+
+            continue
+        case "<":
+            specifiedVers := strings.Split(specifiedVer, ".")
+            vers := strings.Split(ver, ".")
+
+            for i, sv := range specifiedVers {
+                v1, err := strconv.Atoi(sv)
+                if err != nil {
+                    return false, err
+                }
+                v2, err := strconv.Atoi(vers[i])
+                if err != nil {
+                    return false, err
+                }
+
+                if i != len(specifiedVers) - 1 && v1 == v2 {
+                    continue
+                }
+                if v2 < v1 {
+                    break
+                } else {
+                    return false, nil
+                }
+            }
+
+            continue
+        default:
+    		err := fmt.Errorf("Unknown version operator: %s", rng)
+            return false, err
+        }
+    }
+
+    return true, nil
 }
 
 func main() {
@@ -264,7 +357,12 @@ func main() {
             useCocoapodsVersionFromGemfileLock = pod.Version
             log.Donef("Required CocoaPods version (from Gemfile.lock): %s", useCocoapodsVersionFromGemfileLock)
 
-            if !isPodfileLockExists || useCocoapodsVersionFromGemfileLock == useCocoapodsVersionFromPodfileLock {
+            isIncludedVersionRange, err := isIncludedInGemfileLockVersionRanges(useCocoapodsVersionFromPodfileLock, useCocoapodsVersionFromGemfileLock)
+            if err != nil {
+                failf("Failed to compare version range in Gemfile.lock, error: %s", err)
+            }
+
+            if !isPodfileLockExists || isIncludedVersionRange {
                 useBundler = true
             }
         }
