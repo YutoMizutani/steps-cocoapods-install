@@ -135,53 +135,68 @@ func cocoapodsVersionFromPodfileLock(podfileLockPth string) (string, error) {
 	return cocoapodsVersionFromPodfileLockContent(content), nil
 }
 
-func isIncludedInGemfileLockVersionRanges(ver string, gemfileLockVersion string) (bool, error) {
-	var ranges []string
-	ranges = strings.Split(gemfileLockVersion, ", ")
+type OperatorAndVersion struct {
+    Operator string
+    Version string
+}
 
-	for _, rng := range ranges {
-        splitted := strings.Split(rng, " ")
-        aryCnt := len(splitted)
+func splitOperatorAndVersion(input string) (OperatorAndVersion, error) {
+    splittedString := strings.Split(input, " ")
+    cnt := len(splittedString)
 
-        if aryCnt == 1 {
-            specifiedVer := splitted[0]
+    if cnt == 1 {
+        out := OperatorAndVersion{"", splittedString[0]}
+        return out, nil
+	}
 
-            if ver != specifiedVer {
+    if cnt != 2 {
+		err := fmt.Errorf("Invalid version range: %s", input)
+        return OperatorAndVersion{}, err
+	}
+
+    out := OperatorAndVersion{splittedString[0], splittedString[1]}
+    return out, nil
+}
+
+func isIncludedInGemfileLockVersionRanges(input string, gemfileLockVersion string) (bool, error) {
+	var splittedVersions []string
+	splittedVersions = strings.Split(gemfileLockVersion, ", ")
+
+	for _, each := range splittedVersions {
+        operatorAndVersion, err := splitOperatorAndVersion(each)
+    	if err != nil {
+    		return false, err
+    	}
+
+        switch operatorAndVersion.Operator {
+        case "":
+            if input != operatorAndVersion.Version {
                 return false, nil
             }
+
             continue
-    	}
-
-        if aryCnt != 2 {
-    		err := fmt.Errorf("Invalid version range: %s", rng)
-            return false, err
-    	}
-
-        operator := splitted[0]
-        specifiedVer := splitted[1]
-
-        switch operator {
         case "~>":
-            if ver != specifiedVer {
+            if input != operatorAndVersion.Version {
                 return false, nil
             }
 
             continue
         case ">=":
-            specifiedVers := strings.Split(specifiedVer, ".")
-            vers := strings.Split(ver, ".")
+            versions := strings.Split(operatorAndVersion.Version, ".")
+            inputVersions := strings.Split(input, ".")
 
-            for i, sv := range specifiedVers {
-                v1, err := strconv.Atoi(sv)
-                if err != nil {
-                    return false, err
-                }
-                v2, err := strconv.Atoi(vers[i])
+            for i, version := range versions {
+                v1, err := strconv.Atoi(version)
                 if err != nil {
                     return false, err
                 }
 
-                if i != len(specifiedVers) - 1 && v1 == v2 {
+                v2, err := strconv.Atoi(inputVersions[i])
+                if err != nil {
+                    return false, err
+                }
+
+                if i != len(versions) - 1 && v1 == v2 {
                     continue
                 }
                 if v2 >= v1 {
@@ -193,20 +208,21 @@ func isIncludedInGemfileLockVersionRanges(ver string, gemfileLockVersion string)
 
             continue
         case "<":
-            specifiedVers := strings.Split(specifiedVer, ".")
-            vers := strings.Split(ver, ".")
+            versions := strings.Split(operatorAndVersion.Version, ".")
+            inputVersions := strings.Split(input, ".")
 
-            for i, sv := range specifiedVers {
-                v1, err := strconv.Atoi(sv)
-                if err != nil {
-                    return false, err
-                }
-                v2, err := strconv.Atoi(vers[i])
+            for i, version := range versions {
+                v1, err := strconv.Atoi(version)
                 if err != nil {
                     return false, err
                 }
 
-                if i != len(specifiedVers) - 1 && v1 == v2 {
+                v2, err := strconv.Atoi(inputVersions[i])
+                if err != nil {
+                    return false, err
+                }
+
+                if i != len(versions) - 1 && v1 == v2 {
                     continue
                 }
                 if v2 < v1 {
@@ -218,7 +234,7 @@ func isIncludedInGemfileLockVersionRanges(ver string, gemfileLockVersion string)
 
             continue
         default:
-    		err := fmt.Errorf("Unknown version operator: %s", rng)
+    		err := fmt.Errorf("Unknown version operator: %s", each)
             return false, err
         }
     }
